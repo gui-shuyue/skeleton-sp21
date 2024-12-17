@@ -114,6 +114,7 @@ public class Model extends Observable {
         // for the tilt to the Side SIDE. If the board changed, set the
         // changed local variable to true.
 
+
         checkGameOver();
         if (changed) {
             setChanged();
