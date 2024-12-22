@@ -9,10 +9,11 @@ public class IntListExercises {
      * @param lst IntList from Lecture
      */
     public static void addConstant(IntList lst, int c) {
-        IntList head = lst;
-        while (head.rest != null) {
-            head.first += c;
-            head = head.rest;
+        lst.first += c;
+        if (lst.rest == null){
+            return;
+        }else{
+            addConstant(lst.rest, c);
         }
     }
 
@@ -51,7 +52,7 @@ public class IntListExercises {
      */
     public static boolean firstDigitEqualsLastDigit(int x) {
         int lastDigit = x % 10;
-        while (x > 10) {
+        while (x >= 10) {
             x = x / 10;
         }
         int firstDigit = x % 10;
@@ -77,6 +78,6 @@ public class IntListExercises {
             lst.first *= lst.first;
         }
 
-        return currElemIsPrime || squarePrimes(lst.rest);
+        return squarePrimes(lst.rest) || currElemIsPrime;
     }
 }
