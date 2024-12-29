@@ -17,14 +17,18 @@ public class LinkedListDeque<T> implements Deque<T> {
     private Node current;
 
     public LinkedListDeque() {
+        tail = new Node(null, null, null);
         head = new Node(tail, null, tail);
-        tail = new Node(head, null, head);
+        tail.next = head;
+        tail.prev = head;
         size = 0;
     }
 
     public LinkedListDeque(T i){
+        tail = new Node(null, null, null);
         head = new Node(tail, null, tail);
-        tail = new Node(head, null, head);
+        tail.next = head;
+        tail.prev = head;
         head.next = new Node(head, i, tail);
         tail.prev = head.next;
         size = 1;
@@ -53,6 +57,9 @@ public class LinkedListDeque<T> implements Deque<T> {
 
     @Override
     public T removeFirst(){
+        if (size == 0){
+            return null;
+        }
         T x = head.next.item;
         head.next = head.next.next;
         head.next.prev = head;
@@ -62,6 +69,9 @@ public class LinkedListDeque<T> implements Deque<T> {
 
     @Override
     public T removeLast(){
+        if (size == 0){
+            return null;
+        }
         T x = tail.prev.item;
         tail.prev = tail.prev.prev;
         tail.prev.next = tail;
