@@ -103,4 +103,16 @@ public class LinkedListDeque<T> implements Deque<T> {
             return getRecursiveHelper(index - 1, p.next);
         }
     }
+
+    @Override
+    public void printDeque(){
+        Node p = head.next;
+        if (p == tail) {
+            System.out.println(" ");
+            return;
+        }
+        for (int i = 0; i < size; i++) {
+            System.out.print(p.item + " ");
+        }
+    }
 }

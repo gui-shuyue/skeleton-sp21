@@ -12,6 +12,7 @@ public interface Deque<T> {
     public T get(int index);
 
     public boolean equals(Object o);
+    public void printDeque();
 
     //Iterator<T> iterator();
 }
