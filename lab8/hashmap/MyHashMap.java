@@ -17,21 +17,39 @@ public class MyHashMap<K, V> implements Map61B<K, V> {
     @Override
     public void clear() {
         buckets = null;
+        size = 0;
     }
 
     @Override
     public boolean containsKey(K key) {
+        if (getNode(key) != null) {
+            return true;
+        }
         return false;
     }
 
     @Override
     public V get(K key) {
-        return null;
+        Node node = getNode(key);
+        return node == null ? null : node.value;
     }
 
+    private Node getNode(K key) {
+        if (size = 0) {
+            return null;
+        }
+        int index = Math.floorMod(key.hashCode(), buckets.length)
+        for (Node node : buckets[index]) {
+            if (node.key.equals(key)) {
+                return node
+            }
+        }
+        return null;
+    }
+    
     @Override
     public int size() {
-        return 0;
+        return return size;
     }
 
     @Override
@@ -76,7 +94,7 @@ public class MyHashMap<K, V> implements Map61B<K, V> {
     /* Instance Variables */
     private Collection<Node>[] buckets;
     // You should probably define some more!
-    private int size;
+    private int size = 0; // of item
     private double loadFactor;
 
     /** Constructors */
