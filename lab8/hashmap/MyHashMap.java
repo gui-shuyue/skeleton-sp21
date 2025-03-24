@@ -1,16 +1,13 @@
 package hashmap;
 
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.Set;
+import java.util.*;
 
 /**
  *  A hash table-backed Map implementation. Provides amortized constant time
  *  access to elements via get(), remove(), and put() in the best case.
  *
  *  Assumes null keys will never be inserted, and does not resize down upon remove().
- *  @author YOUR NAME HERE
+ *  @author guishy3
  */
 public class MyHashMap<K, V> implements Map61B<K, V> {
 
@@ -35,13 +32,13 @@ public class MyHashMap<K, V> implements Map61B<K, V> {
     }
 
     private Node getNode(K key) {
-        if (size = 0) {
+        if (size == 0) {
             return null;
         }
-        int index = Math.floorMod(key.hashCode(), buckets.length)
+        int index = Math.floorMod(key.hashCode(), buckets.length);
         for (Node node : buckets[index]) {
             if (node.key.equals(key)) {
-                return node
+                return node;
             }
         }
         return null;
@@ -49,32 +46,102 @@ public class MyHashMap<K, V> implements Map61B<K, V> {
     
     @Override
     public int size() {
-        return return size;
+        return size;
     }
 
     @Override
     public void put(K key, V value) {
+        if (getNode(key) != null) {
+            getNode(key).value = value;
+        }
+        else {
+            int index = Math.floorMod(key.hashCode(), buckets.length);
+            buckets[index].add(new Node(key, value));
+            size++;
+        }
 
+        if ((double) size / buckets.length >= loadFactor) {
+            resize(buckets.length * 2);
+        }
+    }
+
+    private void resize(int capacity) {
+        Collection<Node>[] newBuckets = new Collection[capacity];
+        for (int i = 0; i < capacity; i++) {
+            newBuckets[i] = createBucket();
+        }
+
+        for (int i = 0; i < buckets.length; i++) {
+            for (Node node : buckets[i]) {
+                int index = Math.floorMod(node.key.hashCode(), newBuckets.length);
+                newBuckets[index].add(node);
+            }
+        }
+        buckets = newBuckets;
     }
 
     @Override
     public Set<K> keySet() {
-        return Set.of();
+        Set<K> keys = new HashSet<K>();
+        for (Collection<Node> bucket : buckets) {
+            for (Node node : bucket) {
+                keys.add(node.key);
+            }
+        }
+        return keys;
     }
 
     @Override
     public V remove(K key) {
-        return null;
+        Node node = getNode(key);
+        if (node == null) {
+            return null;
+        } else {
+            int index = Math.floorMod(key.hashCode(), buckets.length);
+            buckets[index].remove(node);
+            size--;
+            return node.value;
+        }
     }
 
     @Override
     public V remove(K key, V value) {
-        return null;
+        Node node = getNode(key);
+        if (node == null) {
+            return null;
+        } else if (node.value == value) {
+            return remove(key);
+        } else {
+            return null;
+        }
     }
 
     @Override
     public Iterator<K> iterator() {
-        return null;
+        return new MHMIterator();
+    }
+
+    private class MHMIterator implements Iterator {
+        LinkedList<Node> list;
+
+        public MHMIterator() {
+            list = new LinkedList<Node>();
+            for (Collection<Node> bucket : buckets) {
+                for (Node node : bucket) {
+                    list.addLast(node);
+                }
+            }
+        }
+
+        @Override
+        public boolean hasNext() {
+            return !list.isEmpty();
+        }
+
+        @Override
+        public Node next() {
+            return list.removeFirst();
+        }
     }
 
     /**
@@ -99,13 +166,11 @@ public class MyHashMap<K, V> implements Map61B<K, V> {
 
     /** Constructors */
     public MyHashMap() {
-        this.size = 16;
-        this.loadFactor = 0.75;
+        this(16, 0.75); // 调用MyHashMap(initialSize, maxLoad)
     }
 
     public MyHashMap(int initialSize) {
-        this.size = initialSize;
-        this.loadFactor = 0.75;
+        this(initialSize, 0.75);
     }
 
     /**
@@ -116,11 +181,10 @@ public class MyHashMap<K, V> implements Map61B<K, V> {
      * @param maxLoad maximum load factor
      */
     public MyHashMap(int initialSize, double maxLoad) {
-        this.size = initialSize;
-        this.loadFactor = 0.75;
+        this.loadFactor = maxLoad;
 
-        buckets = new Collection[size];
-        for (int i = 0; i < size; i++) {
+        buckets = new Collection[initialSize];
+        for (int i = 0; i < initialSize; i++) {
             buckets[i] = createBucket();
         }
     }
