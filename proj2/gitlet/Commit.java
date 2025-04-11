@@ -2,6 +2,8 @@ package gitlet;
 
 // TODO: any imports you need here
 
+
+import java.io.Serializable;
 import java.util.Date; // TODO: You'll likely use this in this class
 
 /** Represents a gitlet commit object.
@@ -10,7 +12,7 @@ import java.util.Date; // TODO: You'll likely use this in this class
  *
  *  @author TODO
  */
-public class Commit {
+public class Commit implements Serializable {
     /**
      * TODO: add instance variables here.
      *
@@ -21,6 +23,15 @@ public class Commit {
 
     /** The message of this Commit. */
     private String message;
+    private String id;
 
-    /* TODO: fill in the rest of this class. */
+
+
+
+
+    public String getMessage() {}
+
+    public String getID() {
+        return id;
+    }
 }
