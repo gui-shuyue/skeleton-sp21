@@ -78,7 +78,9 @@ public class Repository {
      * -- [HEAD]
      * */
 
-
+    public void add(String filename) {
+        File file = join(CWD, filename);
+    }
 
     public void checkOperand(int input, int expected) {
         if (input != expected) {
@@ -94,6 +96,13 @@ public class Repository {
     private void writeCommitToFile(Commit commit) {
         File file = join(COMMITS_DIR, commit.getID());
         writeObject(file, commit);
+    }
+
+    private void checkIfInitialized() {
+        if (!GITLET_DIR.isDirectory()) {
+            System.out.println("Not in an initialized Gitlet directory.");
+            System.exit(0);
+        }
     }
 
 
