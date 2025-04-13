@@ -28,6 +28,11 @@ public class Repository {
     public File COMMITS_DIR;
     /** The blobs directory. */
     public File BLOBS_DIR;
+    /** All the branches' name*/
+    public File REFS_DIR;
+    public File HEADS_DIR;
+    /** store the address of the head pointer */
+    public File HEAD;
 
     public void init() {
         if (GITLET_DIR.exists()) {
@@ -38,13 +43,40 @@ public class Repository {
 
         Commit initCommit = new Commit();
         writeCommitToFile(initCommit);
+        String id = initCommit.getID();
+
+        // creat branch "master"
+        String branchName = "master";
+        writeContents(HEAD, "/refs/heads/master");
+        File master = join(HEADS_DIR, branchName);
+        writeContents(master, id);
     }
 
     private void configDirs() {
         GITLET_DIR.mkdirs();
         this.COMMITS_DIR = join(GITLET_DIR, "commits");
         this.BLOBS_DIR = join(GITLET_DIR, "blobs");
+        this.REFS_DIR = join(GITLET_DIR, "refs");
+        this.HEADS_DIR = join(REFS_DIR, "heads");
+        this.HEAD = join(GITLET_DIR, "HEAD");
+        COMMITS_DIR.mkdirs();
+        BLOBS_DIR.mkdirs();
+        REFS_DIR.mkdirs();
+        HEADS_DIR.mkdirs();
     }
+
+    // TODO: stage to be completed.
+    /**
+     * The .gitlet directory
+     * .gitlet
+     * -- commits
+     * -- blobs
+     * -- refs
+     *  -- heads
+     *   -- [master][branch name]
+     *    -- commit id
+     * -- [HEAD]
+     * */
 
 
 
@@ -60,7 +92,9 @@ public class Repository {
     }
 
     private void writeCommitToFile(Commit commit) {
-        File file = join(COMMITS_DIR, commit.getID);
+        File file = join(COMMITS_DIR, commit.getID());
         writeObject(file, commit);
     }
+
+
 }

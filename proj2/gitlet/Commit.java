@@ -1,7 +1,9 @@
 package gitlet;
 
 // TODO: any imports you need here
-
+import java.text.SimpleDateFormat;
+import java.util.*;
+import static gitlet.Utils.*;
 
 import java.io.Serializable;
 import java.util.Date; // TODO: You'll likely use this in this class
@@ -24,14 +26,50 @@ public class Commit implements Serializable {
     /** The message of this Commit. */
     private String message;
     private String id;
+    private String timestamp;
+    private List<String> parents;
+    private HashMap<String, String> blobs;
 
+    /** initial commit */
+    public Commit() {
+        this.message = "initial commit";
+        this.timestamp = formatTime();
+        this.id = sha1(message, timestamp);
+        this.parents = null;
+        this.blobs = new HashMap<String, String>();
+    }
 
+    public Commit(String message, List<Commit> parents, Stage stage) {
+        this.message = message;
+        this.timestamp = formatTime();
+        this.parents = new ArrayList<String>(2);
+        for (Commit parent : parents) {
+            this.parents.add(parent.id);
+        }
+        this.blobs = parents.get(0).blobs; //note that "parents" here is tne argument, not variable.
+        // TODO: update blobs with stage.
 
+        this.id = sha1(message, timestamp);
+    }
 
-
-    public String getMessage() {}
+    public String getMessage() {
+        return message;
+    }
 
     public String getID() {
         return id;
+    }
+
+    private String formatTime() {
+        Date d;
+        if (this.message.equals("initial commit")) {
+            d = new Date(0);
+        }
+        else {
+            d = new Date();
+        }
+        SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy Z");
+        sdf.setTimeZone(TimeZone.getDefault()); // TODO: potential timezone issue to be addressed.
+        return sdf.format(d);
     }
 }
