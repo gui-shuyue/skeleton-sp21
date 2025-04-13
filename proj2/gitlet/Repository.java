@@ -47,7 +47,7 @@ public class Repository {
 
         // creat branch "master"
         String branchName = "master";
-        writeContents(HEAD, "/refs/heads/master");
+        writeContents(HEAD, branchName);
         File master = join(HEADS_DIR, branchName);
         writeContents(master, id);
     }
@@ -79,7 +79,15 @@ public class Repository {
      * */
 
     public void add(String filename) {
+        checkIfInitialized();
         File file = join(CWD, filename);
+        if (!file.exists()) {
+            System.out.println("File does not exist.");
+            System.exit(0);
+        }
+        // TODO: blob
+        Commit headCommit = getHead();
+        
     }
 
     public void checkOperand(int input, int expected) {
@@ -98,6 +106,11 @@ public class Repository {
         writeObject(file, commit);
     }
 
+    private void writeBlobToFile(Blob blob) {
+        File file = join(BLOBS_DIR, blob.getId());
+        writeObject(file, blob);
+    }// TODO: unsure about its accuracy
+
     private void checkIfInitialized() {
         if (!GITLET_DIR.isDirectory()) {
             System.out.println("Not in an initialized Gitlet directory.");
@@ -105,5 +118,29 @@ public class Repository {
         }
     }
 
+    private String getHeadBranchName() {
+        return readContentsAsString(HEAD);
+    }
 
+    /** get the file that contains a commit id, which is the commit at the front of a branch. */
+    private File getBranchFile(String branchName) {
+        File file = join(HEADS_DIR, branchName);
+        return file;
+    } // TODO: may need to change for remote function.
+
+    private Commit getCommitFromFile(File file) {
+        String id = readContentsAsString(file);
+        return getCommitFromId(id);
+    }
+
+    private Commit getCommitFromId(String id) {
+        File file = join(COMMITS_DIR, id);
+        return readObject(file, Commit.class);
+    }
+
+    private Commit getHead() {
+        String headBranchName = getHeadBranchName();
+        File file = getBranchFile(headBranchName);
+        return getCommitFromFile(file);
+    }
 }
