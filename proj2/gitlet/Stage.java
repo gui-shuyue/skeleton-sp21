@@ -7,7 +7,7 @@ import java.util.HashSet;
 
 /** The staging area */
 
-public class Stage {
+public class Stage implements Serializable {
     //<filename, blob's id>
     private HashMap<String, String> add;
     //<filename>
@@ -27,4 +27,14 @@ public class Stage {
         remove.add(file);
         add.remove(file);
     }
+
+    public boolean ifExistInAdd(String fileNane) {
+        return this.add.containsKey(fileNane);
+    }
+
+    public HashMap<String, String> getAdd() {
+        return add;
+    }
+
+    public void writeStageToFile(String fileNane) {}
 }

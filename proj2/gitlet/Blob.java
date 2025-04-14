@@ -24,4 +24,8 @@ public class Blob implements Serializable {
     public String getId() {
         return id;
     }
+
+    public byte[] getContent() {
+        return content;
+    }
 }

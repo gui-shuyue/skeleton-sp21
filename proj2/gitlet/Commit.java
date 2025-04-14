@@ -72,4 +72,8 @@ public class Commit implements Serializable {
         sdf.setTimeZone(TimeZone.getDefault()); // TODO: potential timezone issue to be addressed.
         return sdf.format(d);
     }
+
+    public HashMap<String, String> getBlobs() {
+        return this.blobs;
+    }
 }

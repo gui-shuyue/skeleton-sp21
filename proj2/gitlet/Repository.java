@@ -1,6 +1,8 @@
 package gitlet;
 
 import java.io.File;
+import java.util.HashMap;
+
 import static gitlet.Utils.*;
 
 // TODO: any imports you need here
@@ -33,6 +35,8 @@ public class Repository {
     public File HEADS_DIR;
     /** store the address of the head pointer */
     public File HEAD;
+    /** The staging area. */
+    public File STAGE;
 
     public void init() {
         if (GITLET_DIR.exists()) {
@@ -59,6 +63,7 @@ public class Repository {
         this.REFS_DIR = join(GITLET_DIR, "refs");
         this.HEADS_DIR = join(REFS_DIR, "heads");
         this.HEAD = join(GITLET_DIR, "HEAD");
+        this.STAGE = join(GITLET_DIR, "stage");
         COMMITS_DIR.mkdirs();
         BLOBS_DIR.mkdirs();
         REFS_DIR.mkdirs();
@@ -76,8 +81,16 @@ public class Repository {
      *   -- [master][branch name]
      *    -- commit id
      * -- [HEAD]
+     * -- [stage]
      * */
 
+    /**
+     * 1. Adds a copy of the file as it currently exists to the staging area.
+     * 2. Staging an already-staged file overwrites the previous entry in the staging area with the new contents.
+     * 3. If the current working version of the file is identical to the version in the current commit, do not
+     *    stage it to be added, and remove it from the staging area if it is already there.
+     * 4. The file will no longer be staged for removal, if it was at the time of the command.
+     */
     public void add(String filename) {
         checkIfInitialized();
         File file = join(CWD, filename);
@@ -85,9 +98,31 @@ public class Repository {
             System.out.println("File does not exist.");
             System.exit(0);
         }
-        // TODO: blob
+        // TODO: Too much 'if', how to simplify it?
         Commit headCommit = getHead();
-        
+        Stage stage = getStage();
+        Blob fileToBlob = new Blob(filename, CWD);
+        HashMap<String, String> bolbMap = headCommit.getBlobs();
+        for (String key : bolbMap.keySet()) {
+            if (key.equals(filename)) {
+                // the current working version of the file is identical to the version in the current commit
+                if (bolbMap.get(key).equals(fileToBlob.getId())) {
+                    // remove it from the staging area if it is already there
+                    if (stage.ifExistInAdd(filename)) {
+                        stage.getAdd().remove(filename);
+                        return;
+                    }
+                } else {
+                    // Staging an already-staged file overwrites the previous entry in the staging area with
+                    // the new contents.
+                    stage.addFile(filename, fileToBlob.getId());
+                    writeBlobToFile(fileToBlob);
+                    return;
+                }
+            }
+        }
+        writeBlobToFile(fileToBlob);
+        stage.addFile(filename, fileToBlob.getId());
     }
 
     public void checkOperand(int input, int expected) {
@@ -108,8 +143,14 @@ public class Repository {
 
     private void writeBlobToFile(Blob blob) {
         File file = join(BLOBS_DIR, blob.getId());
-        writeObject(file, blob);
-    }// TODO: unsure about its accuracy
+        // Directly store the corresponding content of the file
+        // TODO: Is it OK?
+        writeContents(file, blob.getContent());
+    }
+
+    public void writeStageToFile(Stage stage) {
+        writeObject(this.STAGE, stage);
+    }
 
     private void checkIfInitialized() {
         if (!GITLET_DIR.isDirectory()) {
@@ -142,5 +183,9 @@ public class Repository {
         String headBranchName = getHeadBranchName();
         File file = getBranchFile(headBranchName);
         return getCommitFromFile(file);
+    }
+
+    private Stage getStage() {
+        return readObject(STAGE, Stage.class);
     }
 }
