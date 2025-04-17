@@ -47,9 +47,15 @@ public class Commit implements Serializable {
             this.parents.add(parent.id);
         }
         this.blobs = parents.get(0).blobs; //note that "parents" here is tne argument, not variable.
-        // TODO: update blobs with stage.
+        for(Map.Entry<String, String> blob : stage.getAdd().entrySet()) {
+            this.blobs.put(blob.getKey(), blob.getValue());
+        }
 
-        this.id = sha1(message, timestamp);
+        for (String file :stage.getRemove()) {
+            this.blobs.remove(file);
+        }
+
+        this.id = sha1(message, timestamp, parents, blobs);
     }
 
     public String getMessage() {
@@ -75,5 +81,9 @@ public class Commit implements Serializable {
 
     public HashMap<String, String> getBlobs() {
         return this.blobs;
+    }
+
+    public boolean ifInBlobs(String filename) {
+        return this.blobs.containsKey(filename);
     }
 }

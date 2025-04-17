@@ -1,9 +1,14 @@
 package gitlet;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.HashMap;
+import java.util.List;
+
 
 import static gitlet.Utils.*;
+import static java.nio.file.Files.delete;
 
 // TODO: any imports you need here
 
@@ -33,7 +38,7 @@ public class Repository {
     /** All the branches' name*/
     public File REFS_DIR;
     public File HEADS_DIR;
-    /** store the address of the head pointer */
+    /** store the name of the head pointer */
     public File HEAD;
     /** The staging area. */
     public File STAGE;
@@ -123,6 +128,7 @@ public class Repository {
         }
         writeBlobToFile(fileToBlob);
         stage.addFile(filename, fileToBlob.getId());
+        writeStageToFile(stage);
     }
 
     /**
@@ -134,13 +140,55 @@ public class Repository {
      * 4. The staging area is cleared after a commit.
      * 5. The head pointer now points to the new commit.
      */
-    public void commit(String message) {
+    public void commit(String message) throws IOException {
         checkIfInitialized();
         if (STAGE.length() == 0) {
             System.out.println("No changes added to the commit.");
             System.exit(0);
         }
         Commit headCommit = getHead();
+        Stage stage = getStage();
+        Commit newCommit = new Commit(message, List.of(headCommit), stage);
+        clearStage();
+        writeCommitToFile(newCommit);
+
+        String id = newCommit.getID();
+        String branchName = getHeadBranchName();
+        File branch = getBranchFile(branchName);
+        writeContents(branch, id);
+    }
+
+    /** 1. Unstage the file if it is currently staged for addition.
+     *  2. If the file is tracked in the current commit, stage it for removal
+     *  and remove the file from the working directory if the user has not
+     *  already done so (do not remove it unless it is tracked in the current commit)*/
+    public void rm(String filename) throws IOException {
+        checkIfInitialized();
+        File file = join(CWD, filename);
+
+        Commit headCommit = getHead();
+        Stage stage = getStage();
+
+        if (!stage.ifExistInAdd(filename) && !headCommit.ifInBlobs(filename)) {
+            System.out.println("No reason to remove the file.");
+            System.exit(0);
+        }
+
+        if (headCommit.ifInBlobs(filename)) {
+            stage.removeFile(filename);
+            delete(file.toPath());
+        } else if (stage.ifExistInAdd(filename)) {
+            stage.removeFile(filename);
+        }
+        writeStageToFile(stage);
+    }
+
+    /** 1. Starting at the current head commit, display information about each
+     *  commit backwards along the commit tree until the initial commit.
+     *  2. Ignore any second parents found in merge commits.
+     *  3. */
+    public void log() {
+        checkIfInitialized();
     }
 
     public void checkOperand(int input, int expected) {
@@ -205,5 +253,9 @@ public class Repository {
 
     private Stage getStage() {
         return readObject(STAGE, Stage.class);
+    }
+
+    private void clearStage() throws IOException {
+        Files.write(STAGE.toPath(), new byte[0]);
     }
 }
