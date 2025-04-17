@@ -136,7 +136,11 @@ public class Repository {
      */
     public void commit(String message) {
         checkIfInitialized();
-        
+        if (STAGE.length() == 0) {
+            System.out.println("No changes added to the commit.");
+            System.exit(0);
+        }
+        Commit headCommit = getHead();
     }
 
     public void checkOperand(int input, int expected) {

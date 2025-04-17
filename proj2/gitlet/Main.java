@@ -25,6 +25,10 @@ public class Main {
                 repo.add(args[1]);
                 break;
             case "commit":
+                if (args.length < 2) {
+                    System.out.println("Please enter a commit message.");
+                    System.exit(0);
+                }
                 repo.checkOperand(args.length, 2);
                 repo.commit(args[1]);
             // TODO: FILL THE REST IN
