@@ -22,7 +22,11 @@ public class Main {
                 break;
             case "add":
                 repo.checkOperand(args.length, 2);
+                repo.add(args[1]);
                 break;
+            case "commit":
+                repo.checkOperand(args.length, 2);
+                repo.commit(args[1]);
             // TODO: FILL THE REST IN
         }
     }

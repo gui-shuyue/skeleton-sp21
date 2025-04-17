@@ -125,6 +125,20 @@ public class Repository {
         stage.addFile(filename, fileToBlob.getId());
     }
 
+    /**
+     * 1. Saves a snapshot of tracked files in the current commit and staging area
+     *    so they can be restored at a later time, creating a new commit.
+     * 2. A commit will only update the contents of files it is tracking that have
+     *    been staged for addition at the time of commit.
+     * 3. Files staged for addition and removal are the updates to the commit.
+     * 4. The staging area is cleared after a commit.
+     * 5. The head pointer now points to the new commit.
+     */
+    public void commit(String message) {
+        checkIfInitialized();
+        
+    }
+
     public void checkOperand(int input, int expected) {
         if (input != expected) {
             msgIncorrectOperands();
