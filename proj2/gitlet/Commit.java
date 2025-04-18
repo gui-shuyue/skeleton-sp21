@@ -55,7 +55,7 @@ public class Commit implements Serializable {
             this.blobs.remove(file);
         }
 
-        this.id = sha1(message, timestamp, parents, blobs);
+        this.id = sha1(message, timestamp, parents.toString(), blobs.toString());
     }
 
     public String getMessage() {
@@ -64,6 +64,14 @@ public class Commit implements Serializable {
 
     public String getID() {
         return id;
+    }
+
+    public List<String> getParents() {
+        return parents;
+    }
+
+    public String getTimestamp() {
+        return timestamp;
     }
 
     private String formatTime() {
@@ -85,5 +93,10 @@ public class Commit implements Serializable {
 
     public boolean ifInBlobs(String filename) {
         return this.blobs.containsKey(filename);
+    }
+
+    public String getFirstPaId() {
+        String parent = this.parents.get(0);
+        return parent;
     }
 }

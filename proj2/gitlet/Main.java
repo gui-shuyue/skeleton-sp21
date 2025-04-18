@@ -33,12 +33,23 @@ public class Main {
                 }
                 repo.checkOperand(args.length, 2);
                 repo.commit(args[1]);
+                break;
             case "rm":
                 repo.checkOperand(args.length, 2);
                 repo.rm(args[1]);
+                break;
             case "log":
                 repo.checkOperand(args.length, 1);
                 repo.log();
+                break;
+            case "global-log":
+                repo.checkOperand(args.length, 1);
+                repo.global_log();
+                break;
+            case "find":
+                repo.checkOperand(args.length, 2);
+                repo.find(args[1]);
+                break;
             // TODO: FILL THE REST IN
         }
     }

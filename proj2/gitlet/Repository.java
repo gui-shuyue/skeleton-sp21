@@ -3,8 +3,10 @@ package gitlet;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
 import static gitlet.Utils.*;
@@ -186,9 +188,45 @@ public class Repository {
     /** 1. Starting at the current head commit, display information about each
      *  commit backwards along the commit tree until the initial commit.
      *  2. Ignore any second parents found in merge commits.
-     *  3. */
+     */
     public void log() {
         checkIfInitialized();
+        Commit commit = getHead();
+        while (commit != null) {
+            printCommit(commit);
+            commit = getCommitFromId(commit.getFirstPaId());
+        }
+    }
+
+    /** Like log, except displays information about all commits ever made.
+     * The order of the commits does not matter.*/
+    public void global_log() {
+        checkIfInitialized();
+        List<String> commitsName = plainFilenamesIn(COMMITS_DIR);
+        for (String commitName : commitsName) {
+            Commit commit = getCommitFromId(commitName);
+            printCommit(commit);
+        }
+    }
+
+    /** Prints out the ids of all commits that have the given commit message, one per line.
+     * If there are multiple such commits, it prints the ids out on separate lines. */
+    public void find(String message) {
+        checkIfInitialized();
+        List<String> commitIds = plainFilenamesIn(COMMITS_DIR);
+        for (String commitId : commitIds) {
+            Commit commit = getCommitFromId(commitId);
+            if (commit.getMessage().equals(message)) {
+                System.out.println(commitId);
+            }
+        }
+    }
+
+    /** Displays what branches currently exist, and marks the current branch with a *.
+     * Also displays what files have been staged for addition or removal.*/
+    private void status() {
+        checkIfInitialized();
+
     }
 
     public void checkOperand(int input, int expected) {
@@ -245,6 +283,11 @@ public class Repository {
         return readObject(file, Commit.class);
     }
 
+    private byte[] getBlobFileFromId(String id) {
+        File file = join(BLOBS_DIR, id);
+        return readContents(file);
+    }
+
     private Commit getHead() {
         String headBranchName = getHeadBranchName();
         File file = getBranchFile(headBranchName);
@@ -257,5 +300,65 @@ public class Repository {
 
     private void clearStage() throws IOException {
         Files.write(STAGE.toPath(), new byte[0]);
+    }
+
+    private void printCommit(Commit commit) {
+        System.out.println("===");
+        System.out.println("commit " + commit.getID());
+        if (commit.getParents().size() == 2) {
+            List<String> parents = commit.getParents();
+            System.out.println("Merge: " + parents.get(0).substring(0, 7) + " " + parents.get(1).substring(0, 7));
+        }
+        System.out.println("Date: " + commit.getTimestamp());
+        System.out.println(commit.getMessage());
+        System.out.println(" ");
+    }
+
+    private void printBranches() {
+        List<String> branchNames = plainFilenamesIn(HEADS_DIR);
+        String head = readContentsAsString(HEAD);
+        for (String branchName : branchNames) {
+            if (branchName.equals(head)) {
+                System.out.println("*" + branchName);
+            } else {
+                System.out.println(branchName);
+            }
+        }
+    }
+
+    private void printStagedFiles() {
+        Stage stage = getStage();
+        for (String file : stage.getAdd().keySet()) {
+            System.out.println(file);
+        }
+    }
+
+    private void printRemoveFiles() {
+        Stage stage = getStage();
+        for (String file : stage.getRemove()) {
+            System.out.println(file);
+        }
+    }
+
+    /** A file in the working directory is “modified but not staged” if it is:
+     *  1. Tracked in the current commit, changed in the working directory, but not staged.
+     *  2. Staged for addition, but with different contents than in the working directory.
+     *  3. Staged for addition, but deleted in the working directory.
+     *  4. Not staged for removal, but tracked in the current commit and deleted from the working directory.
+     */
+    private void printNotStagedFiles() {
+
+    }
+
+    private List<String> getModifiedFiles() {
+        Commit headCommit = getHead();
+        List<String> modifiedFiles = new ArrayList<String>();
+        // <fileName, blobId>
+        for (Map.Entry<String, String> entry : headCommit.getBlobs().entrySet()) {
+            File fileInCWD = join(CWD, entry.getKey());
+            File fileInCommit = new File("temp");
+            writeContents(fileInCommit, getBlobFileFromId(entry.getValue()));
+        }
+
     }
 }
