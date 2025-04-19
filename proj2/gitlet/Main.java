@@ -50,7 +50,30 @@ public class Main {
                 repo.checkOperand(args.length, 2);
                 repo.find(args[1]);
                 break;
-            // TODO: FILL THE REST IN
+            case "status":
+                repo.checkOperand(args.length, 1);
+                repo.status();
+                break;
+            case "checkout":
+                int len = args.length;
+                if (len < 2 || len > 4) {
+                    System.out.println("Incorrect operands");
+                    System.exit(0);
+                }
+                if (len == 2) {
+                    // java gitlet.Main checkout [branch name]
+                    repo.checkoutBranch(args[1]);
+                } else if (len == 3) {
+                    // java gitlet.Main checkout -- [file name]
+                    repo.checkEqual(args[1], "--");
+                    repo.checkoutFile(args[2]);
+                } else if (len == 4) {
+                    // java gitlet.Main checkout [commit id] -- [file name]
+                    repo.checkEqual(args[2], "--");
+                    repo.checkFileFromCommitId(args[1], args[3]);
+                }
+                break;
+                // TODO: FILL THE REST IN
         }
     }
 }

@@ -3,10 +3,7 @@ package gitlet;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 
 import static gitlet.Utils.*;
@@ -224,8 +221,46 @@ public class Repository {
 
     /** Displays what branches currently exist, and marks the current branch with a *.
      * Also displays what files have been staged for addition or removal.*/
-    private void status() {
+    public void status() {
         checkIfInitialized();
+        System.out.println("=== Branches ===");
+        printBranches();
+        System.out.println("=== Staged Files ===");
+        printStagedFiles();
+        System.out.println("=== Removed Files ===");
+        printRemoveFiles();
+        System.out.println("=== Modifications Not Staged For Commit ===");
+        printNotStagedFiles();
+        System.out.println("=== Untracked Files ===");
+        printUntrackedFiles();
+    }
+
+
+    /** Takes all files in the commit at the head of the given branch, and puts them in the
+     * working directory, overwriting the versions of the files that are already there if they exist.*/
+    public void checkoutBranch(String branch) throws IOException {
+        File branchFile = getBranchFile(branch);
+        if (!branchFile.exists()) {
+            System.out.println("No such branch.");
+            System.exit(0);
+        }
+
+        String headBranchName = getHeadBranchName();
+        if (headBranchName.equals(branch)) {
+            System.out.println("No need to checkout the current branch.");
+            System.exit(0);
+        }
+
+        Commit givenCommit = getCommitFromBranch(branch);
+
+        // Any files that are tracked in the current branch but are not present in the checked-out branch are deleted.
+        if (ifUntrackedFileExist(givenCommit)) {
+            System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+            System.exit(0);
+        }
+
+        clearStage();
+        replaceCWDWithCommit(givenCommit);
 
     }
 
@@ -347,18 +382,122 @@ public class Repository {
      *  4. Not staged for removal, but tracked in the current commit and deleted from the working directory.
      */
     private void printNotStagedFiles() {
-
+        System.out.println();
+        List<String> condition_1 = getModifiedFiles();
+        List<String> condition_2_3 = getFilesDiffinAdd_CWD();
+        List<String> condition_4 = notStagedForRemove();
+        List<String> finalList = new ArrayList<>();
+        finalList.addAll(condition_1);
+        finalList.addAll(condition_2_3);
+        finalList.addAll(condition_4);
+        Collections.sort(finalList);
+        for (String file : finalList) {
+            System.out.println(file);
+        }
     }
 
+    // 1
     private List<String> getModifiedFiles() {
         Commit headCommit = getHead();
+        Stage stage = getStage();
         List<String> modifiedFiles = new ArrayList<String>();
         // <fileName, blobId>
         for (Map.Entry<String, String> entry : headCommit.getBlobs().entrySet()) {
             File fileInCWD = join(CWD, entry.getKey());
-            File fileInCommit = new File("temp");
-            writeContents(fileInCommit, getBlobFileFromId(entry.getValue()));
+            byte[] CWDbyte = readContents(fileInCWD);
+            byte[] bytesInBlob = getBlobFileFromId(entry.getValue());
+            if (!Arrays.equals(bytesInBlob, CWDbyte)) {
+                if (!stage.ifExistInAdd(entry.getKey())) {
+                    modifiedFiles.add(entry.getKey());
+                }
+            }
         }
-
+        return modifiedFiles;
     }
+
+    // 2, 3
+    private List<String> getFilesDiffinAdd_CWD() {
+        List<String> diffFiles = new ArrayList<>();
+        Stage stage = getStage();
+        HashMap<String, String> addition = stage.getAdd();
+        for (Map.Entry<String, String> entry : addition.entrySet()) {
+            String fileName = entry.getKey();
+            File fileInCWD = join(CWD, fileName);
+            byte[] CWDbyte = readContents(fileInCWD);
+            byte[] bytesInBlob = getBlobFileFromId(entry.getValue());
+            if (!fileInCWD.exists()) {
+                diffFiles.add(fileName);
+            } else if (!Arrays.equals(bytesInBlob, CWDbyte)) {
+                diffFiles.add(fileName);
+            }
+        }
+        return diffFiles;
+    }
+
+    // 4. 4. Not staged for removal, but tracked in the current commit and deleted from the working directory.
+    private List<String> notStagedForRemove() {
+        List<String> notStagedFiles = new ArrayList<>();
+        Stage stage = getStage();
+        Commit headCommit = getHead();
+        for (Map.Entry<String, String> entry : headCommit.getBlobs().entrySet()) {
+            File fileInCWD = join(CWD, entry.getKey());
+            if (!fileInCWD.exists() && !stage.ifExistInRemove(entry.getKey())) {
+                notStagedFiles.add(entry.getKey());
+            }
+        }
+        return notStagedFiles;
+    }
+
+    private void printUntrackedFiles() {
+        Stage stage = getStage();
+        Commit headCommit = getHead();
+        List<String> files = plainFilenamesIn(CWD);
+        for (String file : files) {
+            if (!stage.ifExistInAdd(file) && !headCommit.ifInBlobs(file)) {
+                System.out.println(file);
+            }
+        }
+    }
+
+    private boolean ifUntrackedFileExist(Commit commit) {
+        List<String> files = plainFilenamesIn(CWD);
+        for (String file : files) {
+            if (!commit.ifInBlobs(file)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void checkEqual(String actual, String expected) {
+        if (!actual.equals(expected)) {
+            msgIncorrectOperands();
+        }
+    }
+
+    private Commit getCommitFromBranch(String branchName) {
+        File branchFile = getBranchFile(branchName);
+        String commitID = readContentsAsString(branchFile);
+        Commit commit = getCommitFromId(commitID);
+        return commit;
+    }
+
+    private void replaceCWDWithCommit(Commit commit) {
+        clearWorkingSpace();
+
+        for (Map.Entry<String, String> item: commit.getBlobs().entrySet()) {
+            String fileName = item.getKey();
+            String blobId = item.getValue();
+            File file = join(CWD, fileName);
+            writeContents(file, getBlobFileFromId(blobId));
+        }
+    }
+
+    private void clearWorkingSpace() {
+        File[] files = CWD.listFiles();
+        for (File file : files) {
+            file.delete();
+        }
+    }
+
 }

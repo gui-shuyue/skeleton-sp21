@@ -32,6 +32,10 @@ public class Stage implements Serializable {
         return this.add.containsKey(fileNane);
     }
 
+    public boolean ifExistInRemove(String fileNane) {
+        return this.remove.contains(fileNane);
+    }
+
     public HashMap<String, String> getAdd() {
         return add;
     }
