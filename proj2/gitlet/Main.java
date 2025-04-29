@@ -73,6 +73,10 @@ public class Main {
                     repo.checkFileFromCommitId(args[1], args[3]);
                 }
                 break;
+            case "branch":
+                repo.checkOperand(args.length, 2);
+                repo.branch(args[1]);
+                break;
                 // TODO: FILL THE REST IN
         }
     }

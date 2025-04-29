@@ -264,6 +264,54 @@ public class Repository {
 
     }
 
+    /** Takes the version of the file as it exists in the head commit and puts it in the working directory, overwriting
+     * the version of the file that’s already there if there is one. The new version of the file is not staged.*/
+    public void checkoutFile(String filename) {
+        checkIfInitialized();
+
+        Commit headCommit = getHead();
+        if (!headCommit.ifInBlobs(filename)) {
+            System.out.println("File does not exist in that commit.");
+            System.exit(0);
+        }
+
+        File file = join(CWD, filename);
+        String blobId = headCommit.getBlobs().get(filename);
+        writeContents(file, getBlobFileFromId(blobId));
+    }
+
+    /** Takes the version of the file as it exists in the commit with the given id, and puts it in the working
+     * directory, overwriting the version of the file that’s already there if there is one. The new version of the
+     * file is not staged.
+     * Note that the commitId in args is shortened.*/
+    public void checkFileFromCommitId(String commitId, String filename) {
+        checkIfInitialized();
+        commitId = getCompleteCommitId(commitId);
+        File commitFile = join(COMMITS_DIR, commitId);
+        if (!commitFile.exists()) {
+            System.out.println("No commit with that id exists.");
+        }
+
+        Commit commit = getCommitFromId(commitId);
+        String blobId = commit.getBlobs().get(filename);
+        writeContents(commitFile, getBlobFileFromId(blobId));
+    }
+
+    /** Creates a new branch with the given name, and points it at the current head commit.*/
+    public void branch(String branch) {
+        checkIfInitialized();
+
+        File branchFile = join(HEADS_DIR, branch);
+        if (branchFile.exists()) {
+            System.out.println("A branch with that name already exists.");
+            System.exit(0);
+        }
+
+        Commit headCommit = getHead();
+        String headCommitId = headCommit.getID();
+        writeContents(branchFile, headCommitId);
+    }
+
     public void checkOperand(int input, int expected) {
         if (input != expected) {
             msgIncorrectOperands();
@@ -498,6 +546,19 @@ public class Repository {
         for (File file : files) {
             file.delete();
         }
+    }
+
+    private String getCompleteCommitId(String commitId) {
+        if (commitId.length() == UID_LENGTH) {
+            return commitId;
+        }
+
+        for (String filename : COMMITS_DIR.list()) {
+            if (filename.startsWith(commitId)) {
+                return filename;
+            }
+        }
+        return null;
     }
 
 }
