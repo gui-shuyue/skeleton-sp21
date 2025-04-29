@@ -77,6 +77,14 @@ public class Main {
                 repo.checkOperand(args.length, 2);
                 repo.branch(args[1]);
                 break;
+            case "rm-branch":
+                repo.checkOperand(args.length, 2);
+                repo.removeBranch(args[1]);
+                break;
+            case "reset":
+                repo.checkOperand(args.length, 2);
+                repo.reset(args[1]);
+                break;
                 // TODO: FILL THE REST IN
         }
     }

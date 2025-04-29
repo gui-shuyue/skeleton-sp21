@@ -1,12 +1,11 @@
 package gitlet;
 
-// TODO: any imports you need here
 import java.text.SimpleDateFormat;
 import java.util.*;
 import static gitlet.Utils.*;
 
 import java.io.Serializable;
-import java.util.Date; // TODO: You'll likely use this in this class
+import java.util.Date;
 
 /** Represents a gitlet commit object.
  *  TODO: It's a good idea to give a description here of what else this Class
@@ -28,7 +27,7 @@ public class Commit implements Serializable {
     private String id;
     private String timestamp;
     private List<String> parents;
-    private HashMap<String, String> blobs;
+    private HashMap<String, String> blobs; // TODO: potential problems, may need to be changed to TreeMap
 
     /** initial commit */
     public Commit() {

@@ -312,6 +312,63 @@ public class Repository {
         writeContents(branchFile, headCommitId);
     }
 
+    /** Deletes the branch with the given name. This only means to delete the pointer associated with the branch;
+     * it does not mean to delete all commits that were created under the branch, or anything like that.*/
+    public  void removeBranch(String branch) {
+         File branchFile = join(HEADS_DIR, branch);
+         if (!branchFile.exists()) {
+             System.out.println("A branch with that name does not exist.");
+             System.exit(0);
+         }
+         String headBranchName = getHeadBranchName();
+         if (headBranchName.equals(branch)) {
+             System.out.println("Cannot remove the current branch.");
+             System.exit(0);
+         }
+
+         branchFile.delete();
+    }
+
+    public void reset(String commitId) throws IOException {
+        checkIfInitialized();
+        commitId = getCompleteCommitId(commitId);
+        Commit headCommit = getHead();
+        File commitFile = join(COMMITS_DIR, commitId);
+        if (!commitFile.exists()) {
+            System.out.println("No commit with that id exists.");
+        }
+        if (ifUntrackedFileExist(headCommit)) {
+            System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+            System.exit(0);
+        }
+        clearStage();
+        replaceCWDWithCommit(headCommit);
+
+        String headBranchName = getHeadBranchName();
+        writeContents(join(HEADS_DIR, headBranchName), commitId);
+    }
+
+    public void merge(String branch) {
+        checkIfInitialized();
+    }
+
+    // Depths of commits from a head of a branch Map<commitId, depth>
+    private Map<String, Integer> calaulateCommitMap(Commit commit, int length) {
+        Map<String, Integer> commitMap = new HashMap<>();
+        if (commit.getParents().isEmpty()) {
+            commitMap.put(commit.getID(), length);
+            return commitMap;
+        }
+
+        commitMap.put(commit.getID(), length);
+        length++;
+        for (String commitId : commit.getParents()) {
+            Commit parent = getCommitFromId(commitId);
+            commitMap.putAll(calaulateCommitMap(parent, length));
+        }
+        return commitMap;
+    }
+
     public void checkOperand(int input, int expected) {
         if (input != expected) {
             msgIncorrectOperands();
