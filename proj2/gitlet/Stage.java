@@ -42,5 +42,4 @@ public class Stage implements Serializable {
 
     public HashSet<String> getRemove() { return remove; }
 
-    public void writeStageToFile(String fileNane) {}
 }

@@ -350,10 +350,31 @@ public class Repository {
 
     public void merge(String branch) {
         checkIfInitialized();
+        if (!checkIfStageClear()) {
+            System.out.println("You have uncommitted changes.");
+        }
+        File branchFile = join(HEADS_DIR, branch);
+        if (!branchFile.exists()) {
+            System.out.println("A branch with that name does not exist.");
+            System.exit(0);
+        }
+        String headBranch = getHeadBranchName();
+        if (headBranch.equals(branch)) {
+            System.out.println("Cannot merge a branch with itself.");
+        }
+        Commit headCommit = getHead();
+        if (ifUntrackedFileExist(headCommit)) {
+            System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+            System.exit(0);
+        }
+
+        Commit givenCommit = getCommitFromBranch(branch);
+        Commit mergeCommit = findSplitPoint(headCommit, givenCommit);
+
     }
 
     // Depths of commits from a head of a branch Map<commitId, depth>
-    private Map<String, Integer> calaulateCommitMap(Commit commit, int length) {
+    private Map<String, Integer> calculateCommitMap(Commit commit, int length) {
         Map<String, Integer> commitMap = new HashMap<>();
         if (commit.getParents().isEmpty()) {
             commitMap.put(commit.getID(), length);
@@ -364,9 +385,28 @@ public class Repository {
         length++;
         for (String commitId : commit.getParents()) {
             Commit parent = getCommitFromId(commitId);
-            commitMap.putAll(calaulateCommitMap(parent, length));
+            commitMap.putAll(calculateCommitMap(parent, length));
         }
         return commitMap;
+    }
+
+    private Commit calculateSplitPoint(Map<String, Integer> map1, Map<String, Integer> map2) {
+        int minLength = Integer.MAX_VALUE;
+        String minId = "";
+        for (String id : map1.keySet()) {
+            if (map2.containsKey(id) && map2.get(id) < minLength) {
+                minLength = map2.get(id);
+                minId = id;
+            }
+        }
+        Commit splitPoint = getCommitFromId(minId);
+        return splitPoint;
+    }
+
+    private Commit findSplitPoint(Commit commit1, Commit commit2) {
+        Map<String, Integer> map1 = calculateCommitMap(commit1, 0);
+        Map<String, Integer> map2 = calculateCommitMap(commit2, 0);
+        return calculateSplitPoint(map1, map2);
     }
 
     public void checkOperand(int input, int expected) {
@@ -616,6 +656,14 @@ public class Repository {
             }
         }
         return null;
+    }
+
+    private boolean checkIfStageClear() {
+        Stage stage = getStage();
+        if (stage.getAdd().isEmpty() && stage.getRemove().isEmpty()) {
+            return true;
+        }
+        return false;
     }
 
 }
