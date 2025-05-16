@@ -369,8 +369,73 @@ public class Repository {
         }
 
         Commit givenCommit = getCommitFromBranch(branch);
-        Commit mergeCommit = findSplitPoint(headCommit, givenCommit);
+        Commit splitCommit = findSplitPoint(headCommit, givenCommit);
 
+        if (splitCommit.equals(headCommit)) {
+            System.out.println("Current branch fast-forwarded.");
+            writeContents(HEAD, branch);
+            System.exit(0);
+        }
+        if (splitCommit.equals(givenCommit)) {
+            System.out.println("Given branch is an ancestor of the current branch.");
+            System.exit(0);
+        }
+
+        String message = "Merged " + branch + " into " + headBranch + ".";
+        String headBranchCommitId = headCommit.getID();
+        String givenBranchCommitId = givenCommit.getID();
+        List<Commit> parents = new ArrayList<>(List.of(headCommit, givenCommit));
+
+
+
+        Commit newCommit = new Commit(message, parents, null);
+
+    }
+    private Stage calculateNewStage(Commit splitCommit, Commit headCommit, Commit givenCommit) {
+        List<String> allFiles = calculateAllFiles(splitCommit, headCommit, givenCommit);
+        Stage stage = new Stage();
+        HashMap<String, String> splitCommitMap = splitCommit.getBlobs();
+        HashMap<String, String> headCommitMap = headCommit.getBlobs();
+        HashMap<String, String> givenCommitMap = givenCommit.getBlobs();
+        for (String file : allFiles) {
+            if (splitCommitMap.containsKey(file)) {
+                if (headCommitMap.containsKey(file) && givenCommitMap.containsKey(file)) {
+                    // 1.modified in given but not HEAD -> given
+                    if (splitCommitMap.get(file).equals(headCommitMap.get(file)) && !splitCommitMap.get(file).equals(givenCommitMap.get(file))) {
+                        stage.addFile(file, givenCommitMap.get(file));
+                    }
+                    // 2.modified in HEAD but not given -> HEAD
+                    if (splitCommitMap.get(file).equals(givenCommitMap.get(file)) && !splitCommitMap.get(file).equals(headCommitMap.get(file))) {
+                        stage.addFile(file, headCommitMap.get(file));
+                    }
+                    // 3.modified in both commits
+                    else {
+                        if (headCommitMap.get(file).equals(givenCommitMap.get(file))) {
+                            stage.addFile(file, givenCommitMap.get(file));
+                        }
+                        else {
+                            dealWithConflict();
+                        }
+                    }
+                }
+            }
+        }
+        return stage;
+    }
+
+    private void dealWithConflict() {
+        
+    }
+
+    // get all files' names have to be considered.
+    private List<String> calculateAllFiles(Commit splitCommit, Commit headCommit, Commit givenCommit) {
+        List<String> allFiles = new ArrayList<String>(splitCommit.getBlobs().keySet());
+        allFiles.addAll(headCommit.getBlobs().keySet());
+        allFiles.addAll(givenCommit.getBlobs().keySet());
+        Set<String> set = new HashSet<>(allFiles);
+        allFiles.clear();
+        allFiles.addAll(set);
+        return allFiles;
     }
 
     // Depths of commits from a head of a branch Map<commitId, depth>
