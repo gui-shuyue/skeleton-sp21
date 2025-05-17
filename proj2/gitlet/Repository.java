@@ -40,12 +40,22 @@ public class Repository {
     /** The staging area. */
     public File STAGE;
 
+    public Repository() {
+        configDirs();  // 在 new Repo() 时自动跑一遍
+    }
+
     public void init() {
-        if (GITLET_DIR.exists()) {
+        if (GITLET_DIR.exists() && GITLET_DIR.isDirectory()) {
             System.out.println("A Gitlet version-control system already exists in the current directory.");
             System.exit(0);
         }
-        configDirs();
+        GITLET_DIR.mkdirs();
+        COMMITS_DIR.mkdirs();
+        BLOBS_DIR.mkdirs();
+        REFS_DIR.mkdirs();
+        HEADS_DIR.mkdirs();
+        Stage stage = new Stage();
+        writeObject(STAGE, stage);
 
         Commit initCommit = new Commit();
         writeCommitToFile(initCommit);
@@ -56,22 +66,18 @@ public class Repository {
         writeContents(HEAD, branchName);
         File master = join(HEADS_DIR, branchName);
         writeContents(master, id);
+
     }
 
     private void configDirs() {
-        GITLET_DIR.mkdirs();
         this.COMMITS_DIR = join(GITLET_DIR, "commits");
         this.BLOBS_DIR = join(GITLET_DIR, "blobs");
         this.REFS_DIR = join(GITLET_DIR, "refs");
         this.HEADS_DIR = join(REFS_DIR, "heads");
         this.HEAD = join(GITLET_DIR, "HEAD");
         this.STAGE = join(GITLET_DIR, "stage");
-        COMMITS_DIR.mkdirs();
-        BLOBS_DIR.mkdirs();
-        REFS_DIR.mkdirs();
-        HEADS_DIR.mkdirs();
-        Stage stage = new Stage();
-        writeObject(STAGE, stage);
+
+
     }
 
     /**
@@ -192,7 +198,11 @@ public class Repository {
         Commit commit = getHead();
         while (commit != null) {
             printCommit(commit);
-            commit = getCommitFromId(commit.getFirstPaId());
+            String parentId = commit.getFirstPaId();
+            if (parentId == null) {
+                break;
+            }
+            commit = getCommitFromId(parentId);
         }
     }
 
@@ -226,15 +236,21 @@ public class Repository {
         checkIfInitialized();
         System.out.println("=== Branches ===");
         printBranches();
+        System.out.println();
         System.out.println("=== Staged Files ===");
         printStagedFiles();
+        System.out.println();
         System.out.println("=== Removed Files ===");
         printRemoveFiles();
+        System.out.println();
         System.out.println("=== Modifications Not Staged For Commit ===");
         printNotStagedFiles();
+        System.out.println();
         System.out.println("=== Untracked Files ===");
         printUntrackedFiles();
+        System.out.println();
     }
+
 
 
     /** Takes all files in the commit at the head of the given branch, and puts them in the
@@ -614,7 +630,7 @@ public class Repository {
     }
 
     private void clearStage() throws IOException {
-        Files.write(STAGE.toPath(), new byte[0]);
+        writeObject(STAGE, new Stage());
     }
 
     private void printCommit(Commit commit) {

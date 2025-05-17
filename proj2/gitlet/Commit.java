@@ -82,8 +82,7 @@ public class Commit implements Serializable {
         else {
             d = new Date();
         }
-        SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy Z");
-        sdf.setTimeZone(TimeZone.getDefault()); // TODO: potential timezone issue to be addressed.
+        SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy Z", Locale.US);
         return sdf.format(d);
     }
 
