@@ -9,17 +9,15 @@ import java.util.*;
 import static gitlet.Utils.*;
 import static java.nio.file.Files.delete;
 
-// TODO: any imports you need here
 
 /** Represents a gitlet repository.
  *  TODO: It's a good idea to give a description here of what else this Class
  *  does at a high level.
  *
- *  @author TODO
+ *  @author Gui
  */
 public class Repository {
     /**
-     * TODO: add instance variables here.
      *
      * List all instance variables of the Repository class here with a useful
      * comment above them describing what that variable represents and how that
@@ -74,7 +72,6 @@ public class Repository {
         HEADS_DIR.mkdirs();
     }
 
-    // TODO: stage to be completed.
     /**
      * The .gitlet directory
      * .gitlet
@@ -294,7 +291,8 @@ public class Repository {
 
         Commit commit = getCommitFromId(commitId);
         String blobId = commit.getBlobs().get(filename);
-        writeContents(commitFile, getBlobFileFromId(blobId));
+        File file = join(CWD, filename);
+        writeContents(file, getBlobFileFromId(blobId));
     }
 
     /** Creates a new branch with the given name, and points it at the current head commit.*/
@@ -348,7 +346,7 @@ public class Repository {
         writeContents(join(HEADS_DIR, headBranchName), commitId);
     }
 
-    public void merge(String branch) {
+    public void merge(String branch) throws IOException {
         checkIfInitialized();
         if (!checkIfStageClear()) {
             System.out.println("You have uncommitted changes.");
@@ -385,11 +383,25 @@ public class Repository {
         String headBranchCommitId = headCommit.getID();
         String givenBranchCommitId = givenCommit.getID();
         List<Commit> parents = new ArrayList<>(List.of(headCommit, givenCommit));
+        Stage stage = calculateNewStage(splitCommit, headCommit, givenCommit);
 
+        Commit newCommit = new Commit(message, parents, stage);
+        writeCommitToFile(newCommit);
+        File headBranchFile = getBranchFile(headBranch);
+        writeContents(headBranchFile, newCommit.getID());
+        checkoutCommit(newCommit);
 
+    }
 
-        Commit newCommit = new Commit(message, parents, null);
-
+    private void checkoutCommit(Commit commit) {
+        clearWorkingSpace();
+        for (Map.Entry<String, String> e : commit.getBlobs().entrySet()) {
+            String fileName = e.getKey();
+            String blobId   = e.getValue();
+            byte[] data     = getBlobFileFromId(blobId);
+            File f = join(CWD, fileName);
+            writeContents(f, data);
+        }
     }
     private Stage calculateNewStage(Commit splitCommit, Commit headCommit, Commit givenCommit) {
         List<String> allFiles = calculateAllFiles(splitCommit, headCommit, givenCommit);
@@ -399,32 +411,79 @@ public class Repository {
         HashMap<String, String> givenCommitMap = givenCommit.getBlobs();
         for (String file : allFiles) {
             if (splitCommitMap.containsKey(file)) {
-                if (headCommitMap.containsKey(file) && givenCommitMap.containsKey(file)) {
+
+                if (splitCommitMap.get(file).equals(headCommitMap.get(file))) {
+                    // 6.unmodified in HEAD but not present in given -> remove
+                    if (!givenCommitMap.containsKey(file)) {
+                        stage.removeFile(file);
+                    }
                     // 1.modified in given but not HEAD -> given
-                    if (splitCommitMap.get(file).equals(headCommitMap.get(file)) && !splitCommitMap.get(file).equals(givenCommitMap.get(file))) {
+                    else if (!splitCommitMap.get(file).equals(givenCommitMap.get(file))) {
                         stage.addFile(file, givenCommitMap.get(file));
                     }
+                }
+
+                if (splitCommitMap.get(file).equals(givenCommitMap.get(file))) {
+                    // 7.unmodified in given but not present in HEAD ->
+                    if (!headCommitMap.containsKey(file)) {
+                        continue;
+                    }
                     // 2.modified in HEAD but not given -> HEAD
-                    if (splitCommitMap.get(file).equals(givenCommitMap.get(file)) && !splitCommitMap.get(file).equals(headCommitMap.get(file))) {
+                    else if (!splitCommitMap.get(file).equals(headCommitMap.get(file))) {
                         stage.addFile(file, headCommitMap.get(file));
                     }
-                    // 3.modified in both commits
-                    else {
-                        if (headCommitMap.get(file).equals(givenCommitMap.get(file))) {
-                            stage.addFile(file, givenCommitMap.get(file));
-                        }
-                        else {
-                            dealWithConflict();
-                        }
+
+                }
+                // 3.modified in both commits
+                else {
+                    if (headCommitMap.get(file).equals(givenCommitMap.get(file))) {
+                        stage.addFile(file, givenCommitMap.get(file));
                     }
+                    else {
+                        String headId = headCommitMap.get(file);
+                        String givenId = givenCommitMap.get(file);
+                        dealWithConflict(file, headId, givenId, stage);
+                    }
+
+                }
+
+            }
+            else {
+                // 4. not in split nor other but in HEAD -> HEAD
+                if (!givenCommitMap.containsKey(file) && headCommitMap.containsKey(file)) {
+                    stage.addFile(file, headCommitMap.get(file));
+                }
+                // 5. not in split nor HEAD but in given -> given
+                else if (!headCommitMap.containsKey(file) && givenCommitMap.containsKey(file)) {
+                    stage.addFile(file, givenCommitMap.get(file));
                 }
             }
+
         }
         return stage;
     }
 
-    private void dealWithConflict() {
-        
+    private void dealWithConflict(String file, String headId, String givenId, Stage stage) {
+        byte[] headBytes  = (headId  == null ? new byte[0] : getBlobFileFromId(headId));
+        byte[] givenBytes = (givenId == null ? new byte[0] : getBlobFileFromId(givenId));
+        String headContent = new String(headBytes);
+        String givenContent = new String(givenBytes);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("<<<<<<< HEAD\n");
+        sb.append(headContent);
+        sb.append("=======\n");
+        sb.append(givenContent);
+        sb.append(">>>>>>>");
+        String conflictText = sb.toString();
+        byte[] conflictBytes = conflictText.getBytes();
+
+        File f = join(CWD, file);
+        writeContents(f, conflictBytes);
+
+        Blob newBlob = new Blob(file, CWD);
+        writeBlobToFile(newBlob);
+        stage.addFile(file, newBlob.getId());
     }
 
     // get all files' names have to be considered.

@@ -85,6 +85,10 @@ public class Main {
                 repo.checkOperand(args.length, 2);
                 repo.reset(args[1]);
                 break;
+            case "merge":
+                repo.checkOperand(args.length, 2);
+                repo.merge(args[1]);
+                break;
                 // TODO: FILL THE REST IN
         }
     }
