@@ -34,7 +34,7 @@ public class Commit implements Serializable {
         this.message = "initial commit";
         this.timestamp = formatTime();
         this.id = sha1(message, timestamp);
-        this.parents = null;
+        this.parents = new ArrayList<>();
         this.blobs = new HashMap<String, String>();
     }
 
@@ -45,7 +45,8 @@ public class Commit implements Serializable {
         for (Commit parent : parents) {
             this.parents.add(parent.id);
         }
-        this.blobs = parents.get(0).blobs; //note that "parents" here is tne argument, not variable.
+
+        this.blobs = new HashMap<>(parents.get(0).getBlobs()); //note that "parents" here is tne argument, not variable.
         for(Map.Entry<String, String> blob : stage.getAdd().entrySet()) {
             this.blobs.put(blob.getKey(), blob.getValue());
         }
@@ -95,7 +96,9 @@ public class Commit implements Serializable {
     }
 
     public String getFirstPaId() {
-        String parent = this.parents.get(0);
-        return parent;
+        if (parents.isEmpty()) {
+            return null;  // or throw an IllegalStateException("No parent")
+        }
+        return parents.get(0);
     }
 }

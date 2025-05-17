@@ -70,6 +70,8 @@ public class Repository {
         BLOBS_DIR.mkdirs();
         REFS_DIR.mkdirs();
         HEADS_DIR.mkdirs();
+        Stage stage = new Stage();
+        writeObject(STAGE, stage);
     }
 
     /**
@@ -111,6 +113,7 @@ public class Repository {
                     // remove it from the staging area if it is already there
                     if (stage.ifExistInAdd(filename)) {
                         stage.getAdd().remove(filename);
+                        writeStageToFile(stage);
                         return;
                     }
                 } else {
@@ -118,6 +121,7 @@ public class Repository {
                     // the new contents.
                     stage.addFile(filename, fileToBlob.getId());
                     writeBlobToFile(fileToBlob);
+                    writeStageToFile(stage);
                     return;
                 }
             }
@@ -258,6 +262,7 @@ public class Repository {
 
         clearStage();
         replaceCWDWithCommit(givenCommit);
+        writeContents(HEAD, branch);
 
     }
 
@@ -287,9 +292,13 @@ public class Repository {
         File commitFile = join(COMMITS_DIR, commitId);
         if (!commitFile.exists()) {
             System.out.println("No commit with that id exists.");
+            System.exit(0);
         }
 
         Commit commit = getCommitFromId(commitId);
+        if (!commit.ifInBlobs(filename)) {
+            System.out.println("File does not exist in that commit.");
+        }
         String blobId = commit.getBlobs().get(filename);
         File file = join(CWD, filename);
         writeContents(file, getBlobFileFromId(blobId));
@@ -332,15 +341,17 @@ public class Repository {
         commitId = getCompleteCommitId(commitId);
         Commit headCommit = getHead();
         File commitFile = join(COMMITS_DIR, commitId);
+        Commit targetCommit = getCommitFromId(commitId);
         if (!commitFile.exists()) {
             System.out.println("No commit with that id exists.");
+            System.exit(0);
         }
         if (ifUntrackedFileExist(headCommit)) {
             System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
             System.exit(0);
         }
         clearStage();
-        replaceCWDWithCommit(headCommit);
+        replaceCWDWithCommit(targetCommit);
 
         String headBranchName = getHeadBranchName();
         writeContents(join(HEADS_DIR, headBranchName), commitId);
@@ -350,6 +361,7 @@ public class Repository {
         checkIfInitialized();
         if (!checkIfStageClear()) {
             System.out.println("You have uncommitted changes.");
+            System.exit(0);
         }
         File branchFile = join(HEADS_DIR, branch);
         if (!branchFile.exists()) {
@@ -359,6 +371,7 @@ public class Repository {
         String headBranch = getHeadBranchName();
         if (headBranch.equals(branch)) {
             System.out.println("Cannot merge a branch with itself.");
+            System.exit(0);
         }
         Commit headCommit = getHead();
         if (ifUntrackedFileExist(headCommit)) {
@@ -380,8 +393,6 @@ public class Repository {
         }
 
         String message = "Merged " + branch + " into " + headBranch + ".";
-        String headBranchCommitId = headCommit.getID();
-        String givenBranchCommitId = givenCommit.getID();
         List<Commit> parents = new ArrayList<>(List.of(headCommit, givenCommit));
         Stage stage = calculateNewStage(splitCommit, headCommit, givenCommit);
 
@@ -651,7 +662,6 @@ public class Repository {
      *  4. Not staged for removal, but tracked in the current commit and deleted from the working directory.
      */
     private void printNotStagedFiles() {
-        System.out.println();
         List<String> condition_1 = getModifiedFiles();
         List<String> condition_2_3 = getFilesDiffinAdd_CWD();
         List<String> condition_4 = notStagedForRemove();

@@ -57,7 +57,7 @@ public class Main {
             case "checkout":
                 int len = args.length;
                 if (len < 2 || len > 4) {
-                    System.out.println("Incorrect operands");
+                    System.out.println("Incorrect operands.");
                     System.exit(0);
                 }
                 if (len == 2) {
@@ -89,6 +89,9 @@ public class Main {
                 repo.checkOperand(args.length, 2);
                 repo.merge(args[1]);
                 break;
+            default:
+                System.out.println("No command with that name exists.");
+                System.exit(0);
                 // TODO: FILL THE REST IN
         }
     }
