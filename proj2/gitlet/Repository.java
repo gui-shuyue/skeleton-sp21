@@ -456,7 +456,7 @@ public class Repository {
         if (conflictFlag == true) {
             System.out.println("Encountered a merge conflict.");
         }
-        
+
         Commit newCommit = new Commit(message, parents, stage);
         writeCommitToFile(newCommit);
         File headBranchFile = getBranchFile(headBranch);
@@ -487,7 +487,27 @@ public class Repository {
         HashMap<String, String> headCommitMap = headCommit.getBlobs();
         HashMap<String, String> givenCommitMap = givenCommit.getBlobs();
         for (String file : allFiles) {
+            // —— 新增：split 无、head & given 都有 ——
+            if (!splitCommitMap.containsKey(file)
+                    && headCommitMap.containsKey(file)
+                    && givenCommitMap.containsKey(file)) {
+                if (!headCommitMap.get(file).equals(givenCommitMap.get(file))) {
+                    dealWithConflict(file,
+                            headCommitMap.get(file),
+                            givenCommitMap.get(file),
+                            stage);
+                    conflictFlag = true;
+                    } else {
+                        stage.addFile(file, headCommitMap.get(file));
+                    }
+                continue;
+                }
             if (splitCommitMap.containsKey(file)) {
+                // —— 新增：split 中有，head/given 都没 —— 两边都删，跳过（文件删除）
+                if (!headCommitMap.containsKey(file) && !givenCommitMap.containsKey(file)) {
+                    stage.removeFile(file);
+                    continue;
+                    }
 
                 if (splitCommitMap.get(file).equals(headCommitMap.get(file))) {
                     // 6.unmodified in HEAD but not present in given -> remove
