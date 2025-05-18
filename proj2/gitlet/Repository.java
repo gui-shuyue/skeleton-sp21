@@ -40,6 +40,7 @@ public class Repository {
     /** The staging area. */
     public File STAGE;
 
+    private boolean conflictFlag = false;
     public Repository() {
         configDirs();  // 在 new Repo() 时自动跑一遍
     }
@@ -122,6 +123,7 @@ public class Repository {
                         writeStageToFile(stage);
                         return;
                     }
+                    return;
                 } else {
                     // Staging an already-staged file overwrites the previous entry in the staging area with
                     // the new contents.
@@ -148,9 +150,12 @@ public class Repository {
      */
     public void commit(String message) throws IOException {
         checkIfInitialized();
-        if (STAGE.length() == 0) {
+        if (checkIfStageClear()) {
             System.out.println("No changes added to the commit.");
             System.exit(0);
+        }
+        if (message.isEmpty()) {
+            System.out.println("Please enter a commit message.");
         }
         Commit headCommit = getHead();
         Stage stage = getStage();
@@ -167,7 +172,12 @@ public class Repository {
     /** 1. Unstage the file if it is currently staged for addition.
      *  2. If the file is tracked in the current commit, stage it for removal
      *  and remove the file from the working directory if the user has not
-     *  already done so (do not remove it unless it is tracked in the current commit)*/
+     *  already done so (do not remove it unless it is tracked in the current commit)
+     *  文件刚被add进addstage而没有commit，直接删除addstage中的Blob就可以。
+     *
+     * 文件被当前Commit追踪并且存在于工作目录中，那么就将及放入removestage并且在工作目录中删除此文件。在下次commit中进行记录。
+     *
+     * 文件被当前Commit追踪并且不存在于工作目录中，那么就将及放入removestage并即可（commit之后手动删除文件，然后执行rm，第二次rm就对应这种情况）。*/
     public void rm(String filename) throws IOException {
         checkIfInitialized();
         File file = join(CWD, filename);
@@ -181,10 +191,15 @@ public class Repository {
         }
 
         if (headCommit.ifInBlobs(filename)) {
-            stage.removeFile(filename);
-            delete(file.toPath());
+            if (file.exists()) {
+                stage.removeFile(filename);
+                delete(file.toPath());
+            } else {
+                stage.removeFile(filename);
+            }
+
         } else if (stage.ifExistInAdd(filename)) {
-            stage.removeFile(filename);
+            stage.getAdd().remove(filename);
         }
         writeStageToFile(stage);
     }
@@ -226,8 +241,10 @@ public class Repository {
             Commit commit = getCommitFromId(commitId);
             if (commit.getMessage().equals(message)) {
                 System.out.println(commitId);
+                return;
             }
         }
+        System.out.println("Found no commit with that message.");
     }
 
     /** Displays what branches currently exist, and marks the current branch with a *.
@@ -258,26 +275,34 @@ public class Repository {
     public void checkoutBranch(String branch) throws IOException {
         File branchFile = getBranchFile(branch);
         if (!branchFile.exists()) {
-            System.out.println("No such branch.");
+            System.out.println("No such branch exists.");
             System.exit(0);
         }
+        Commit headCommit = getHead();
 
         String headBranchName = getHeadBranchName();
         if (headBranchName.equals(branch)) {
             System.out.println("No need to checkout the current branch.");
             System.exit(0);
         }
-
+        Stage stage = getStage();
         Commit givenCommit = getCommitFromBranch(branch);
 
         // Any files that are tracked in the current branch but are not present in the checked-out branch are deleted.
-        if (ifUntrackedFileExist(givenCommit)) {
-            System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
-            System.exit(0);
+        for (String fname : Utils.plainFilenamesIn(CWD)) {
+            boolean here = headCommit.ifInBlobs(fname);
+            boolean there = givenCommit.ifInBlobs(fname);
+            // 只有「当前没跟踪、目标有跟踪」才阻塞
+            if (!here && there && !stage.ifExistInAdd(fname)) {
+                System.out.println("There is an untracked file in the way; "
+                        + "delete it, or add and commit it first.");
+                System.exit(0);
+            }
         }
 
+
         clearStage();
-        replaceCWDWithCommit(givenCommit);
+        checkoutCommit(givenCommit);
         writeContents(HEAD, branch);
 
     }
@@ -314,6 +339,7 @@ public class Repository {
         Commit commit = getCommitFromId(commitId);
         if (!commit.ifInBlobs(filename)) {
             System.out.println("File does not exist in that commit.");
+            System.exit(0);
         }
         String blobId = commit.getBlobs().get(filename);
         File file = join(CWD, filename);
@@ -357,17 +383,25 @@ public class Repository {
         commitId = getCompleteCommitId(commitId);
         Commit headCommit = getHead();
         File commitFile = join(COMMITS_DIR, commitId);
-        Commit targetCommit = getCommitFromId(commitId);
+
+        Stage stage = getStage();
         if (!commitFile.exists()) {
             System.out.println("No commit with that id exists.");
             System.exit(0);
         }
-        if (ifUntrackedFileExist(headCommit)) {
-            System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
-            System.exit(0);
+        Commit targetCommit = getCommitFromId(commitId);
+        for (String fname : Utils.plainFilenamesIn(CWD)) {
+            boolean here = headCommit.ifInBlobs(fname);
+            boolean there = targetCommit.ifInBlobs(fname);
+            // 只有「当前没跟踪、目标有跟踪」才阻塞
+            if (!here && there && !stage.ifExistInAdd(fname)) {
+                System.out.println("There is an untracked file in the way; "
+                        + "delete it, or add and commit it first.");
+                System.exit(0);
+            }
         }
         clearStage();
-        replaceCWDWithCommit(targetCommit);
+        checkoutCommit(targetCommit);
 
         String headBranchName = getHeadBranchName();
         writeContents(join(HEADS_DIR, headBranchName), commitId);
@@ -398,12 +432,19 @@ public class Repository {
         Commit givenCommit = getCommitFromBranch(branch);
         Commit splitCommit = findSplitPoint(headCommit, givenCommit);
 
-        if (splitCommit.equals(headCommit)) {
+        //System.out.printf("DEBUG: split=%s   head=%s   given=%s\n",
+                //splitCommit.getID(), headCommit.getID(), givenCommit.getID());
+
+        // if (splitCommit.equals(headCommit))
+        if (splitCommit.getID().equals(headCommit.getID())){
             System.out.println("Current branch fast-forwarded.");
+            clearStage();
+            checkoutCommit(givenCommit);
             writeContents(HEAD, branch);
             System.exit(0);
         }
-        if (splitCommit.equals(givenCommit)) {
+        //if (splitCommit.equals(givenCommit)) {
+        if (splitCommit.getID().equals(givenCommit.getID())){
             System.out.println("Given branch is an ancestor of the current branch.");
             System.exit(0);
         }
@@ -412,6 +453,10 @@ public class Repository {
         List<Commit> parents = new ArrayList<>(List.of(headCommit, givenCommit));
         Stage stage = calculateNewStage(splitCommit, headCommit, givenCommit);
 
+        if (conflictFlag == true) {
+            System.out.println("Encountered a merge conflict.");
+        }
+        
         Commit newCommit = new Commit(message, parents, stage);
         writeCommitToFile(newCommit);
         File headBranchFile = getBranchFile(headBranch);
@@ -421,7 +466,12 @@ public class Repository {
     }
 
     private void checkoutCommit(Commit commit) {
-        clearWorkingSpace();
+        Commit headCommit = getHead();
+        for (String fname : headCommit.getBlobs().keySet()) {
+            if (!commit.getBlobs().containsKey(fname)) {
+                Utils.restrictedDelete(Utils.join(CWD, fname));
+            }
+        }
         for (Map.Entry<String, String> e : commit.getBlobs().entrySet()) {
             String fileName = e.getKey();
             String blobId   = e.getValue();
@@ -443,6 +493,7 @@ public class Repository {
                     // 6.unmodified in HEAD but not present in given -> remove
                     if (!givenCommitMap.containsKey(file)) {
                         stage.removeFile(file);
+                        continue;
                     }
                     // 1.modified in given but not HEAD -> given
                     else if (!splitCommitMap.get(file).equals(givenCommitMap.get(file))) {
@@ -470,6 +521,7 @@ public class Repository {
                         String headId = headCommitMap.get(file);
                         String givenId = givenCommitMap.get(file);
                         dealWithConflict(file, headId, givenId, stage);
+                        conflictFlag = true;
                     }
 
                 }
@@ -501,7 +553,7 @@ public class Repository {
         sb.append(headContent);
         sb.append("=======\n");
         sb.append(givenContent);
-        sb.append(">>>>>>>");
+        sb.append(">>>>>>>\n");
         String conflictText = sb.toString();
         byte[] conflictBytes = conflictText.getBytes();
 
@@ -698,12 +750,23 @@ public class Repository {
         List<String> modifiedFiles = new ArrayList<String>();
         // <fileName, blobId>
         for (Map.Entry<String, String> entry : headCommit.getBlobs().entrySet()) {
-            File fileInCWD = join(CWD, entry.getKey());
-            byte[] CWDbyte = readContents(fileInCWD);
-            byte[] bytesInBlob = getBlobFileFromId(entry.getValue());
-            if (!Arrays.equals(bytesInBlob, CWDbyte)) {
-                if (!stage.ifExistInAdd(entry.getKey())) {
-                    modifiedFiles.add(entry.getKey());
+            String fileName = entry.getKey();
+            File fileInCWD = join(CWD, fileName);
+            String blobId = entry.getValue();
+
+            if (!fileInCWD.exists()) {
+                // 工作区里文件被删了，但如果它已经被 staged for removal，就跳过；
+                // 否则算作“未暂存的修改”里的“删除”情况
+                if (!stage.ifExistInRemove(fileName)) {
+                    modifiedFiles.add(fileName);
+                }
+            } else {
+                // 文件确实存在，才去读内容比较
+                byte[] cwdBytes  = readContents(fileInCWD);
+                byte[] blobBytes = getBlobFileFromId(blobId);
+                if (!Arrays.equals(cwdBytes, blobBytes)
+                        && !stage.ifExistInAdd(fileName)) {
+                    modifiedFiles.add(fileName);
                 }
             }
         }
@@ -715,15 +778,19 @@ public class Repository {
         List<String> diffFiles = new ArrayList<>();
         Stage stage = getStage();
         HashMap<String, String> addition = stage.getAdd();
-        for (Map.Entry<String, String> entry : addition.entrySet()) {
+        for (Map.Entry<String, String> entry : stage.getAdd().entrySet()) {
             String fileName = entry.getKey();
             File fileInCWD = join(CWD, fileName);
-            byte[] CWDbyte = readContents(fileInCWD);
-            byte[] bytesInBlob = getBlobFileFromId(entry.getValue());
             if (!fileInCWD.exists()) {
+                // 被 staged for addition 后又被删掉
                 diffFiles.add(fileName);
-            } else if (!Arrays.equals(bytesInBlob, CWDbyte)) {
-                diffFiles.add(fileName);
+            } else {
+                byte[] cwdBytes  = readContents(fileInCWD);
+                byte[] blobBytes = getBlobFileFromId(entry.getValue());
+                if (!Arrays.equals(cwdBytes, blobBytes)) {
+                    // 文件内容被修改但没重新 add
+                    diffFiles.add(fileName);
+                }
             }
         }
         return diffFiles;
@@ -748,7 +815,7 @@ public class Repository {
         Commit headCommit = getHead();
         List<String> files = plainFilenamesIn(CWD);
         for (String file : files) {
-            if (!stage.ifExistInAdd(file) && !headCommit.ifInBlobs(file)) {
+            if (stage.ifExistInRemove(file) || (!stage.ifExistInAdd(file) && !headCommit.ifInBlobs(file))) {
                 System.out.println(file);
             }
         }
